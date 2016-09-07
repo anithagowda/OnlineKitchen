@@ -2,11 +2,9 @@ package com.food.yummy.onlinekitchen.ui;
 
 import android.app.SearchManager;
 import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
-import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -14,12 +12,20 @@ import android.support.v7.widget.SearchView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Toast;
 
 import com.food.yummy.onlinekitchen.R;
+import com.food.yummy.onlinekitchen.dataModel.AppError;
+import com.food.yummy.onlinekitchen.dataModel.Food2ForkResponse;
+import com.food.yummy.onlinekitchen.service.RecipeService;
+import com.food.yummy.onlinekitchen.utilities.AlertDialogUtil;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
+import java.util.Arrays;
 
 public class TopRatedRecipeActivity extends AppCompatActivity {
     private RecipeAdapter mAdapter;
@@ -30,6 +36,7 @@ public class TopRatedRecipeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_top_rated_recipe);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        getSupportActionBar().setTitle("OnlineKitchen");
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -40,12 +47,29 @@ public class TopRatedRecipeActivity extends AppCompatActivity {
             }
         });
 
+        initView();
+        RecipeService.getTopRatedRecipes();
+    }
+
+    private void initView() {
         RecyclerView mRecyclerView = (RecyclerView) findViewById(R.id.recipe_list);
         mRecyclerView.setHasFixedSize(true);
         mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
 
         mAdapter = new RecipeAdapter();
         mRecyclerView.setAdapter(mAdapter);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        EventBus.getDefault().register(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        EventBus.getDefault().unregister(this);
     }
 
     @Override
@@ -76,10 +100,19 @@ public class TopRatedRecipeActivity extends AppCompatActivity {
                 return false;
             }
         });
-
-
         return true;
     }
 
+    @Subscribe(threadMode = ThreadMode.MAIN, sticky = true)
+    public void onReceivingRecipes(final Food2ForkResponse response) {
+        EventBus.getDefault().removeStickyEvent(response);
+        mAdapter.setRecipesList(Arrays.asList(response.getRecipes()));
+        mAdapter.notifyDataSetChanged();
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onError(AppError.Error error) {
+        AlertDialogUtil.showAlertDialogWithOK("Error", AppError.getFriendlyMessage(error), this, false);
+    }
 
 }
